@@ -25,7 +25,11 @@ arrow_c_glib_run_test()
 {
   local arrow_c_glib_lib_dir=$1
 
-  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$arrow_c_glib_lib_dir
+  if [ $TRAVIS_OS_NAME = "osx" ]; then
+    export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$arrow_c_glib_lib_dir
+  else
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$arrow_c_glib_lib_dir
+  fi
   export GI_TYPELIB_PATH=$arrow_c_glib_lib_dir/girepository-1.0
   test/run-test.rb
 
@@ -56,8 +60,8 @@ export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$ARROW_CPP_INSTALL/lib/pkgconfig
 (arrow_c_glib_run_test $ARROW_C_GLIB_INSTALL_AUTOTOOLS/lib)
 if [ -d $ARROW_C_GLIB_INSTALL_MESON/lib/$(arch)-linux-gnu ]; then
   (arrow_c_glib_run_test $ARROW_C_GLIB_INSTALL_MESON/lib/$(arch)-linux-gnu)
-# else # TODO: Enable this
-#   (arrow_c_glib_run_test $ARROW_C_GLIB_INSTALL_MESON/lib)
+else
+  (arrow_c_glib_run_test $ARROW_C_GLIB_INSTALL_MESON/lib)
 fi
 
 popd

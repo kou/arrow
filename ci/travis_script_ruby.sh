@@ -25,7 +25,11 @@ arrow_ruby_run_test()
 {
   local arrow_c_glib_lib_dir=$1
 
-  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$arrow_c_glib_lib_dir
+  if [ $TRAVIS_OS_NAME = "osx" ]; then
+    export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$arrow_c_glib_lib_dir
+  else
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$arrow_c_glib_lib_dir
+  fi
   export GI_TYPELIB_PATH=$arrow_c_glib_lib_dir/girepository-1.0
   test/run-test.rb
 }
@@ -37,8 +41,8 @@ pushd $ARROW_RUBY_DIR/red-arrow
 (arrow_ruby_run_test $ARROW_C_GLIB_INSTALL_AUTOTOOLS/lib)
 if [ -d $ARROW_C_GLIB_INSTALL_MESON/lib/$(arch)-linux-gnu ]; then
   (arrow_ruby_run_test $ARROW_C_GLIB_INSTALL_MESON/lib/$(arch)-linux-gnu)
-# else # TODO: Enable this
-#   (arrow_ruby_run_test $ARROW_C_GLIB_INSTALL_MESON/lib)
+else
+  (arrow_ruby_run_test $ARROW_C_GLIB_INSTALL_MESON/lib)
 fi
 popd
 
@@ -47,8 +51,8 @@ popd
 # (arrow_ruby_run_test $ARROW_C_GLIB_INSTALL_AUTOTOOLS/lib)
 # if [ -d $ARROW_C_GLIB_INSTALL_MESON/lib/$(arch)-linux-gnu ]; then
 #   (arrow_ruby_run_test $ARROW_C_GLIB_INSTALL_MESON/lib/$(arch)-linux-gnu)
-# # else # TODO: Enable this
-# #   (arrow_ruby_run_test $ARROW_C_GLIB_INSTALL_MESON/lib)
+# else
+#   (arrow_ruby_run_test $ARROW_C_GLIB_INSTALL_MESON/lib)
 # fi
 # popd
 
@@ -56,8 +60,8 @@ pushd $ARROW_RUBY_DIR/red-gandiva
 (arrow_ruby_run_test $ARROW_C_GLIB_INSTALL_AUTOTOOLS/lib)
 if [ -d $ARROW_C_GLIB_INSTALL_MESON/lib/$(arch)-linux-gnu ]; then
   (arrow_ruby_run_test $ARROW_C_GLIB_INSTALL_MESON/lib/$(arch)-linux-gnu)
-# else # TODO: Enable this
-#   (arrow_ruby_run_test $ARROW_C_GLIB_INSTALL_MESON/lib)
+else
+  (arrow_ruby_run_test $ARROW_C_GLIB_INSTALL_MESON/lib)
 fi
 popd
 
@@ -65,8 +69,8 @@ pushd $ARROW_RUBY_DIR/red-parquet
 (arrow_ruby_run_test $ARROW_C_GLIB_INSTALL_AUTOTOOLS/lib)
 if [ -d $ARROW_C_GLIB_INSTALL_MESON/lib/$(arch)-linux-gnu ]; then
   (arrow_ruby_run_test $ARROW_C_GLIB_INSTALL_MESON/lib/$(arch)-linux-gnu)
-# else # TODO: Enable this
-#   (arrow_ruby_run_test $ARROW_C_GLIB_INSTALL_MESON/lib)
+else
+  (arrow_ruby_run_test $ARROW_C_GLIB_INSTALL_MESON/lib)
 fi
 popd
 
@@ -74,7 +78,7 @@ pushd $ARROW_RUBY_DIR/red-plasma
 (arrow_ruby_run_test $ARROW_C_GLIB_INSTALL_AUTOTOOLS/lib)
 if [ -d $ARROW_C_GLIB_INSTALL_MESON/lib/$(arch)-linux-gnu ]; then
   (arrow_ruby_run_test $ARROW_C_GLIB_INSTALL_MESON/lib/$(arch)-linux-gnu)
-# else # TODO: Enable this
-#   (arrow_ruby_run_test $ARROW_C_GLIB_INSTALL_MESON/lib)
+else
+  (arrow_ruby_run_test $ARROW_C_GLIB_INSTALL_MESON/lib)
 fi
 popd
