@@ -65,6 +65,8 @@ garrow_error_code(const arrow::Status &status)
     return GARROW_ERROR_SERIALIZATION;
   case arrow::StatusCode::PythonError:
     return GARROW_ERROR_PYTHON;
+  case arrow::StatusCode::RError:
+    return GARROW_ERROR_R;
   case arrow::StatusCode::PlasmaObjectExists:
     return GARROW_ERROR_PLASMA_OBJECT_EXISTS;
   case arrow::StatusCode::PlasmaObjectNonexistent:
