@@ -123,9 +123,9 @@ StringBuilder::StringBuilder(MemoryPool* pool) : BinaryBuilder(utf8(), pool) {}
 
 Status StringBuilder::AppendValues(const std::vector<std::string>& values,
                                    const uint8_t* valid_bytes) {
-  std::size_t total_length = std::accumulate(
+  auto total_length = std::accumulate(
       values.begin(), values.end(), 0ULL,
-      [](uint64_t sum, const std::string& str) { return sum + str.size(); });
+      [](int64_t sum, const std::string& str) { return sum + str.size(); });
   RETURN_NOT_OK(Reserve(values.size()));
   RETURN_NOT_OK(value_data_builder_.Reserve(total_length));
   RETURN_NOT_OK(offsets_builder_.Reserve(values.size()));
@@ -153,7 +153,7 @@ Status StringBuilder::AppendValues(const std::vector<std::string>& values,
 Status StringBuilder::AppendValues(const char** values, int64_t length,
                                    const uint8_t* valid_bytes) {
   std::size_t total_length = 0;
-  std::vector<std::size_t> value_lengths(length);
+  std::vector<std::size_t> value_lengths(static_cast<size_t>(length));
   bool have_null_value = false;
   for (int64_t i = 0; i < length; ++i) {
     if (values[i]) {

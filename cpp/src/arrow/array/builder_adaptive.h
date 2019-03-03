@@ -34,7 +34,7 @@ class ARROW_EXPORT AdaptiveIntBuilderBase : public ArrayBuilder {
   Status AppendNulls(int64_t length) {
     ARROW_RETURN_NOT_OK(CommitPendingData());
     ARROW_RETURN_NOT_OK(Reserve(length));
-    memset(data_->mutable_data() + length_ * int_size_, 0, int_size_ * length);
+    memset(data_->mutable_data() + length_ * int_size_, 0, static_cast<size_t>(int_size_ * length));
     UnsafeSetNull(length);
     return Status::OK();
   }

@@ -40,7 +40,7 @@ struct GenerateOptions {
   GenerateOptions(SeedType seed, ValueType min, ValueType max, double probability)
       : min_(min), max_(max), seed_(seed), probability_(probability) {}
 
-  void GenerateData(uint8_t* buffer, size_t n) {
+  void GenerateData(uint8_t* buffer, int64_t n) {
     std::default_random_engine rng(seed_++);
     DistributionType dist(min_, max_);
 
@@ -51,12 +51,12 @@ struct GenerateOptions {
                   [&dist, &rng] { return static_cast<ValueType>(dist(rng)); });
   }
 
-  void GenerateBitmap(uint8_t* buffer, size_t n, int64_t* null_count) {
+  void GenerateBitmap(uint8_t* buffer, int64_t n, int64_t* null_count) {
     int64_t count = 0;
     std::default_random_engine rng(seed_++);
     std::bernoulli_distribution dist(1.0 - probability_);
 
-    for (size_t i = 0; i < n; i++) {
+    for (int64_t i = 0; i < n; i++) {
       if (dist(rng)) {
         BitUtil::SetBit(buffer, i);
       } else {

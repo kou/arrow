@@ -66,7 +66,7 @@ class ARROW_EXPORT BufferBuilder {
     capacity_ = buffer_->capacity();
     data_ = buffer_->mutable_data();
     if (capacity_ > old_capacity) {
-      memset(data_ + old_capacity, 0, capacity_ - old_capacity);
+      memset(data_ + old_capacity, 0, static_cast<size_t>(capacity_ - old_capacity));
     }
     return Status::OK();
   }
