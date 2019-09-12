@@ -51,6 +51,23 @@ base_include_directories = [
   include_directories('.')
 ]
 
+cpp_compiler = meson.get_compiler('cpp')
+
+vcpkg_prefix = get_option('vcpkg_prefix')
+if vcpkg_prefix == ''
+  gobject = dependency('gobject-2.0')
+  gio = dependency('gio-2.0')
+else
+  base_include_directories += [
+    include_directories(join_paths(vcpkg_prefix, 'include')),
+  ]
+  vcpkg_lib_directory = join_paths(vcpkg_prefix, 'lib')
+  gobject = cpp_compiler.find_library('gobject-2.0',
+                                      dirs: [vcpkg_lib_directory])
+  gio = cpp_compiler.find_library('gio-2.0',
+                                  dirs: [vcpkg_lib_directory])
+endif
+
 arrow_cpp_build_dir = get_option('arrow_cpp_build_dir')
 arrow_cpp_build_type = get_option('arrow_cpp_build_type')
 if arrow_cpp_build_dir == ''
@@ -61,18 +78,38 @@ else
 endif
 
 if arrow_cpp_build_lib_dir == ''
-  arrow = dependency('arrow')
-  have_arrow_orc = dependency('arrow-orc', required: false).found()
-  arrow_cuda = dependency('arrow-cuda', required: false)
-  gandiva = dependency('gandiva', required: false)
-  parquet = dependency('parquet', required: false)
-  plasma = dependency('plasma', required: false)
+  arrow = dependency('arrow', method: 'pkg-config', required: false)
+  if arrow.found()
+    have_arrow_orc = dependency('arrow-orc', required: false).found()
+    arrow_cuda = dependency('arrow-cuda', required: false)
+    gandiva = dependency('gandiva', required: false)
+    parquet = dependency('parquet', required: false)
+    plasma = dependency('plasma', required: false)
+  else
+    arrow = dependency('arrow', method: 'cmake', modules: ['arrow_shared'])
+    have_arrow_orc = false
+    arrow_cuda = dependency('arrow',
+                            method: 'cmake',
+                            modules: ['arrow_cuda_shared'],
+                            required: false)
+    gandiva = dependency('arrow',
+                         method: 'cmake',
+                         modules: ['gandiva_shared'],
+                         required: false)
+    parquet = dependency('arrow',
+                         method: 'cmake',
+                         modules: ['parquet_shared'],
+                         required: false)
+    plasma = dependency('arrow',
+                        method: 'cmake',
+                        modules: ['plasma_shared'],
+                        required: false)
+  endif
 else
   base_include_directories += [
     include_directories(join_paths(arrow_cpp_build_dir, 'src')),
     include_directories('../cpp/src'),
   ]
-  cpp_compiler = meson.get_compiler('cpp')
   arrow = cpp_compiler.find_library('arrow',
                                     dirs: [arrow_cpp_build_lib_dir])
   arrow_orc_code = '''

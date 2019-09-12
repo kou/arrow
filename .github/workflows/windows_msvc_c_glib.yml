@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-name: Windows MSVC C++
+name: Windows MSVC C GLib
 on:
   - push
   - pull_request
@@ -24,18 +24,24 @@ jobs:
     name: Build
     strategy:
       matrix:
-        cmake-generator:
-          - Visual Studio 16 2019
-          - Visual Studio 15 2017
+        label:
+          - "2019"
+          - "2017"
         include:
-          - cmake-generator: Visual Studio 16 2019
+          - label: "2019"
             os: windows-2019
-          - cmake-generator: Visual Studio 15 2017
+            visual-studio-year: 2019
+            cmake-generator: Visual Studio 16 2019
+            meson-backend: vs2019
+          - label: "2017"
             os: windows-2016
+            visual-studio-year: 2017
+            cmake-generator: Visual Studio 15 2017
+            meson-backend: vs2017
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@master
-      - name: CMake
+      - name: "C++: CMake"
         run: |
           mkdir build\cpp
           cmake ^
@@ -44,9 +50,31 @@ jobs:
             -DARROW_USE_GLOG=OFF ^
             -DARROW_WITH_LZ4=OFF ^
             -DARROW_WITH_ZLIB=OFF ^
-            -DCMAKE_INSTALL_PREFIX=install ^
+            -DCMAKE_INSTALL_PREFIX=%CD%\install ^
             -S cpp ^
             -B build\cpp
-      - name: Install
+      - name: "C++: Install"
         run: |
           cmake --build build\cpp --config Debug --target Install
+      - uses: actions/setup-python@v1
+      - name: "C GLib: Install Meson"
+        run: |
+          pip install meson
+      - name: "C GLib: Install GLib"
+        run: |
+          vcpkg install glib:x64-windows
+      - name: "C GLib: Meson"
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\${{ matrix.visual-studio-year }}\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          meson ^
+            setup ^
+            --backend=${{ matrix.meson-backend }} ^
+            --cmake-prefix-path=%CD%\install ^
+            --prefix=%CD%\install ^
+            -Dintrospection=false ^
+            -Dvcpkg_prefix=c:\vcpkg\installed\x64-windows ^
+            build\c_glib ^
+            c_glib
+      - name: "C GLib: Install"
+        run: |
+          msbuild -target:all;install build\c_glib

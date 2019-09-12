@@ -22,6 +22,11 @@ option('gtk_doc',
        value: false,
        description: 'Build document by GTK-Doc')
 
+option('introspection',
+       type: 'boolean',
+       value: true,
+       description: 'Build GObject Introspection data')
+
 option('arrow_cpp_build_type',
        type: 'string',
        value: 'release',
@@ -31,3 +36,8 @@ option('arrow_cpp_build_dir',
        type: 'string',
        value: '',
        description: 'Use this option to build with not installed Arrow C++')
+
+option('vcpkg_prefix',
+       type: 'string',
+       value: '',
+       description: 'Use this option to build with GLib installed by vcpkg')
