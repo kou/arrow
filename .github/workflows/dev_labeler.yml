@@ -28,3 +28,4 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         configuration-path: .github/workflows/dev_labeler/labeler.yml
         sync-labels: true
+        debug: true
