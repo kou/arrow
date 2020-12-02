@@ -18,7 +18,6 @@
 include(ProcessorCount)
 processorcount(NPROC)
 
-add_custom_target(rapidjson)
 add_custom_target(toolchain)
 add_custom_target(toolchain-benchmarks)
 add_custom_target(toolchain-tests)
@@ -62,6 +61,7 @@ set(ARROW_THIRDPARTY_DEPENDENCIES
     GTest
     LLVM
     Lz4
+    msgpack
     ORC
     RE2
     Protobuf
@@ -138,6 +138,8 @@ macro(build_dependency DEPENDENCY_NAME)
     build_gtest()
   elseif("${DEPENDENCY_NAME}" STREQUAL "Lz4")
     build_lz4()
+  elseif("${DEPENDENCY_NAME}" STREQUAL "msgpack")
+    build_msgpack()
   elseif("${DEPENDENCY_NAME}" STREQUAL "ORC")
     build_orc()
   elseif("${DEPENDENCY_NAME}" STREQUAL "Protobuf")
@@ -243,6 +245,10 @@ endif()
 
 if(ARROW_JSON)
   set(ARROW_WITH_RAPIDJSON ON)
+endif()
+
+if(ARROW_MESSAGE_PACK)
+  set(ARROW_WITH_MSGPACK ON)
 endif()
 
 if(ARROW_ORC OR ARROW_FLIGHT OR ARROW_GANDIVA)
@@ -462,6 +468,16 @@ else()
   set_urls(
     LZ4_SOURCE_URL "https://github.com/lz4/lz4/archive/${ARROW_LZ4_BUILD_VERSION}.tar.gz"
     "https://github.com/ursa-labs/thirdparty/releases/download/latest/lz4-${ARROW_LZ4_BUILD_VERSION}.tar.gz"
+    )
+endif()
+
+if(DEFINED ENV{ARROW_MSGPACK_URL})
+  set(MSGPACK_SOURCE_URL "$ENV{ARROW_MSGPACK_URL}")
+else()
+  set_urls(
+    MSGPACK_SOURCE_URL
+    "https://github.com/msgpack/msgpack-c/archive/msgpack-${ARROW_MSGPACK_BUILD_VERSION}.tar.gz"
+    "https://github.com/ursa-labs/thirdparty/releases/download/latest/msgpack-${ARROW_MSGPACK_BUILD_VERSION}.tar.gz"
     )
 endif()
 
@@ -834,7 +850,8 @@ if(ARROW_BUILD_INTEGRATION
    OR (ARROW_FLIGHT AND ARROW_BUILD_BENCHMARKS)
    OR (ARROW_S3 AND ARROW_BUILD_BENCHMARKS)
    OR (ARROW_WITH_THRIFT AND THRIFT_REQUIRES_BOOST)
-   OR (ARROW_PARQUET AND PARQUET_REQUIRES_BOOST))
+   OR (ARROW_PARQUET AND PARQUET_REQUIRES_BOOST)
+   OR ARROW_MESSAGE_PACK)
   set(ARROW_BOOST_REQUIRED TRUE)
 else()
   set(ARROW_BOOST_REQUIRED FALSE)
@@ -1886,6 +1903,38 @@ if(ARROW_WITH_RAPIDJSON)
 
   # TODO: Don't use global includes but rather target_include_directories
   include_directories(SYSTEM ${RAPIDJSON_INCLUDE_DIR})
+endif()
+
+macro(build_msgpack)
+  message(STATUS "Building msgpack from source")
+  set(MSGPACK_PREFIX
+      "${CMAKE_CURRENT_BINARY_DIR}/msgpack_ep-install")
+  set(MSGPACK_CMAKE_ARGS
+      ${EP_COMMON_CMAKE_ARGS}
+      "-DCMAKE_INSTALL_PREFIX=${MSGPACK_PREFIX}")
+
+  externalproject_add(msgpack_ep
+                      ${EP_LOG_OPTIONS}
+                      PREFIX "${CMAKE_BINARY_DIR}"
+                      URL ${MSGPACK_SOURCE_URL}
+                      CMAKE_ARGS ${MSGPACK_CMAKE_ARGS})
+
+  add_library(msgpackc-cxx INTERFACE IMPORTED)
+  set_target_properties(msgpackc-cxx PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "${MSGPACK_PREFIX}/include")
+
+  add_dependencies(toolchain msgpack_ep)
+  add_dependencies(toolchain-tests msgpack_ep)
+  add_dependencies(msgpack msgpack_ep)
+
+  set(MSGPACK_VENDORED TRUE)
+endmacro()
+
+if(ARROW_WITH_MSGPACK)
+  resolve_dependency(msgpack)
+  get_target_property(MSGPACK_INCLUDE_DIRS msgpackc-cxx INTERFACE_INCLUDE_DIRECTORIES)
+  # TODO: Don't use global includes but rather target_include_directories
+  include_directories(SYSTEM ${MSGPACK_INCLUDE_DIR})
 endif()
 
 macro(build_zlib)

@@ -457,6 +457,12 @@ if(ARROW_JSON)
               json/reader.cc)
 endif()
 
+if(ARROW_MESSAGE_PACK)
+  list(APPEND ARROW_SRCS
+              message_pack/options.cc
+              message_pack/reader.cc)
+endif()
+
 if(ARROW_ORC)
   list(APPEND ARROW_SRCS adapters/orc/adapter.cc adapters/orc/adapter_util.cc)
 endif()
@@ -680,6 +686,10 @@ endif()
 
 if(ARROW_JSON)
   add_subdirectory(json)
+endif()
+
+if(ARROW_MESSAGE_PACK)
+  add_subdirectory(message_pack)
 endif()
 
 if(ARROW_ORC)

@@ -242,6 +242,8 @@ if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
 
   define_option(ARROW_MIMALLOC "Build the Arrow mimalloc-based allocator" OFF)
 
+  define_option(ARROW_MESSAGE_PACK "Build Arrow with MessagePack (requires msgpack)" OFF)
+
   define_option(ARROW_PARQUET "Build the Parquet libraries" OFF)
 
   define_option(ARROW_ORC "Build the Arrow ORC adapter" OFF)
