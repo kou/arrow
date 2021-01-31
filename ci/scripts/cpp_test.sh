@@ -63,6 +63,7 @@ case "$(uname)" in
       exclude_tests="${exclude_tests}|gandiva-null-validity-test"
     fi
     ctest_options+=(--exclude-regex "${exclude_tests}")
+    ctest_options+=(--repeat until-pass:2)
     ;;
   *)
     n_jobs=${NPROC:-1}
