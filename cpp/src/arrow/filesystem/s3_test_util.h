@@ -74,11 +74,11 @@ class MinioTestServer {
   std::string secret_key() const { return secret_key_; }
 
  private:
-  std::unique_ptr<TemporaryDir> temp_dir_;
   std::string connect_string_;
   std::string access_key_ = kMinioAccessKey;
   std::string secret_key_ = kMinioSecretKey;
   std::shared_ptr<::boost::process::child> server_process_;
+  std::unique_ptr<TemporaryDir> temp_dir_;
 };
 
 Status MinioTestServer::Start() {
