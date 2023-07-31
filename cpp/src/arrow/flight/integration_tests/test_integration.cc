@@ -784,8 +784,7 @@ class PollFlightInfoScenario : public Scenario {
 
   Status RunClient(std::unique_ptr<FlightClient> client) override {
     ARROW_ASSIGN_OR_RAISE(
-        auto info,
-        client->PollFlightInfo(FlightDescriptor::Command("heavy query")));
+        auto info, client->PollFlightInfo(FlightDescriptor::Command("heavy query")));
     if (!info->descriptor.has_value()) {
       return Status::Invalid("Description is missing: ", info->ToString());
     }
