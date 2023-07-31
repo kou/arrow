@@ -584,6 +584,14 @@ arrow::Result<std::unique_ptr<FlightInfo>> FlightClient::GetFlightInfo(
   return info;
 }
 
+arrow::Result<std::unique_ptr<RetryInfo>> FlightClient::PollFlightInfo(
+    const FlightCallOptions& options, const FlightDescriptor& descriptor) {
+  std::unique_ptr<RetryInfo> info;
+  RETURN_NOT_OK(CheckOpen());
+  RETURN_NOT_OK(transport_->PollFlightInfo(options, descriptor, &info));
+  return info;
+}
+
 arrow::Result<std::unique_ptr<SchemaResult>> FlightClient::GetSchema(
     const FlightCallOptions& options, const FlightDescriptor& descriptor) {
   RETURN_NOT_OK(CheckOpen());
