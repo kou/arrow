@@ -249,8 +249,12 @@ if(WIN32)
       endforeach()
     endif()
 
-    # Support large object code
-    set(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} /bigobj")
+    message("XXX: ${CMAKE_CXX_COMPILER_ID}")
+    if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+      # Support large object code.
+      # clang-cl doesn't support this.
+      set(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} /bigobj")
+    endif()
 
     # We may use UTF-8 in source code such as
     # cpp/src/arrow/compute/kernels/scalar_string_test.cc
