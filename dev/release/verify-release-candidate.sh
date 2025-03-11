@@ -99,7 +99,8 @@ detect_cuda() {
   return $((${n_gpus} < 1))
 }
 
-ARROW_DIST_URL='https://dist.apache.org/repos/dist/dev/arrow'
+#ARROW_DIST_URL='https://dist.apache.org/repos/dist/dev/arrow'
+ARROW_DIST_URL='https://dist.apache.org/repos/dist/release/arrow'
 
 download_dist_file() {
   curl \
@@ -111,7 +112,8 @@ download_dist_file() {
 }
 
 download_rc_file() {
-  download_dist_file apache-arrow-${VERSION}-rc${RC_NUMBER}/$1
+#  download_dist_file apache-arrow-${VERSION}-rc${RC_NUMBER}/$1
+  download_dist_file arrow-${VERSION}/$1
 }
 
 import_gpg_keys() {

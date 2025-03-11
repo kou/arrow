@@ -68,7 +68,7 @@ jobs:
 
   wheels-linux:
     name: Wheels Linux
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -78,6 +78,9 @@ jobs:
           - conda
           - ubuntu-22.04
           - ubuntu-24.04
+        runs-on:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
     env:
       TEST_WHEELS: "1"
     steps:
@@ -100,6 +103,11 @@ jobs:
             version=${distro#*-}
             echo "SERVICE=${os}-verify-rc" >> ${GITHUB_ENV}
             echo "$(echo ${os} | tr a-z A-Z)=${version}" >> ${GITHUB_ENV}
+          fi
+          if [ "$(arch)" = "aarch64" ]; then
+            echo "ARCH=arm64v8" >> ${GITHUB_ENV}
+          else
+            echo "ARCH=amd64" >> ${GITHUB_ENV}
           fi
       - name: Run
         run: |
