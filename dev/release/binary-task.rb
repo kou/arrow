@@ -68,6 +68,10 @@ class BinaryTask
       when :artifactory
         # Too many workers cause Artifactory error.
         6
+      when :maven_repository
+        # Too many workers break ASF policy:
+        # https://infra.apache.org/infra-ban.html
+        4
       when :gpg
         # Too many workers cause gpg-agent error.
         2
@@ -251,7 +255,7 @@ class BinaryTask
     end
   end
 
-  class ArtifactoryClient
+  class HTTPClient
     class Error < StandardError
       attr_reader :request
       attr_reader :response
@@ -262,16 +266,8 @@ class BinaryTask
       end
     end
 
-    def initialize(prefix, api_key)
-      @prefix = prefix
-      @api_key = api_key
+    def initialize
       @http = nil
-      restart
-    end
-
-    def restart
-      close
-      @http = start_http(build_url(""))
     end
 
     private def start_http(url, &block)
@@ -301,6 +297,7 @@ class BinaryTask
           return
         end
       end
+      @http ||= start_http(url)
       request_internal(@http, request, &block)
     end
 
@@ -334,45 +331,8 @@ class BinaryTask
       end
     end
 
-    def files
-      _files = []
-      directories = [""]
-      until directories.empty?
-        directory = directories.shift
-        list(directory).each do |path|
-          resolved_path = "#{directory}#{path}"
-          case path
-          when "../"
-          when /\/\z/
-            directories << resolved_path
-          else
-            _files << resolved_path
-          end
-        end
-      end
-      _files
-    end
-
-    def list(path)
-      url = build_url(path)
-      with_retry(3, url) do
-        begin
-          request(:get, {}, url) do |response|
-            response.body.scan(/<a href="(.+?)"/).flatten
-          end
-        rescue Error => error
-          case error.response
-          when Net::HTTPNotFound
-            return []
-          else
-            raise
-          end
-        end
-      end
-    end
-
     def head(path)
-      url = build_url(path)
+      url = build_read_url(path)
       with_retry(3, url) do
         request(:head, {}, url)
       end
@@ -392,27 +352,8 @@ class BinaryTask
       end
     end
 
-    def upload(path, destination_path)
-      destination_url = build_url(destination_path)
-      with_retry(3, destination_url) do
-        sha1 = Digest::SHA1.file(path).hexdigest
-        sha256 = Digest::SHA256.file(path).hexdigest
-        headers = {
-          "X-Artifactory-Last-Modified" => File.mtime(path).rfc2822,
-          "X-Checksum-Deploy" => "false",
-          "X-Checksum-Sha1" => sha1,
-          "X-Checksum-Sha256" => sha256,
-          "Content-Length" => File.size(path).to_s,
-          "Content-Type" => "application/octet-stream",
-        }
-        File.open(path, "rb") do |input|
-          request(:put, headers, destination_url, body: input)
-        end
-      end
-    end
-
     def download(path, output_path=nil)
-      url = build_url(path)
+      url = build_read_url(path)
       with_retry(5, url) do
         begin
           begin
@@ -457,42 +398,13 @@ class BinaryTask
     end
 
     def delete(path)
-      url = build_url(path)
+      url = build_write_url(path)
       with_retry(3, url) do
         request(:delete, {}, url)
       end
     end
 
-    def copy(source, destination)
-      url = build_api_url("copy/arrow/#{source}",
-                          "to" => "/arrow/#{destination}")
-      with_retry(3, url) do
-        with_read_timeout(300) do
-          request(:post, {}, url)
-        end
-      end
-    end
-
     private
-    def build_url(path)
-      uri_string = "https://apache.jfrog.io/artifactory/arrow"
-      uri_string << "/#{@prefix}" unless @prefix.nil?
-      uri_string << "/#{path}"
-      URI(uri_string)
-    end
-
-    def build_api_url(path, parameters)
-      uri_string = "https://apache.jfrog.io/artifactory/api/#{path}"
-      unless parameters.empty?
-        uri_string << "?"
-        escaped_parameters = parameters.collect do |key, value|
-          "#{CGI.escape(key)}=#{CGI.escape(value)}"
-        end
-        uri_string << escaped_parameters.join("&")
-      end
-      URI(uri_string)
-    end
-
     def build_request(method, url, headers, body: nil)
       need_auth = false
       case method
@@ -513,7 +425,7 @@ class BinaryTask
         raise "unsupported HTTP method: #{method.inspect}"
       end
       request["Connection"] = "Keep-Alive"
-      request["X-JFrog-Art-Api"] = @api_key if need_auth
+      setup_auth(request) if need_auth
       if body
         if body.is_a?(String)
           request.body = body
@@ -539,7 +451,7 @@ class BinaryTask
           $stderr.puts
           $stderr.puts("Retry #{n_retries}: #{target}: " +
                        "#{error.class}: #{error.message}")
-          restart
+          close
           retry
         else
           raise
@@ -558,10 +470,234 @@ class BinaryTask
     end
   end
 
-  class ArtifactoryClientPool
+  # See also the REST API document:
+  # https://support.sonatype.com/hc/en-us/articles/213465868-Uploading-to-a-Nexus-Repository-2-Staging-Repository-via-REST-API
+  class MavenRepositoryClient < HTTPClient
+    BASE_URL = "https://repository.apache.org"
+    STAGING_API_BASE_URL = BASE_URL + "/service/local/staging"
+
+    def initialize(prefix, repository_id, asf_user, asf_password)
+      @prefix = prefix
+      @repository_id = repository_id
+      @asf_user = asf_user
+      @asf_password = asf_password
+      super()
+    end
+
+    def create_staging_repository(description="")
+      # The profile ID of "org.apache.arrow".
+      # See also: https://issues.apache.org/jira/browse/INFRA-26626
+      profile_id = "2653a12a1cbe8b"
+      url_string = "#{STAGING_API_BASE_URL}/profiles/#{profile_id}/start"
+      url = URI(url_string)
+      headers = {"Content-Type" => "application/xml"}
+      response = request(:post, headers, url, body: <<-REQUEST)
+<promoteRequest>
+  <data>
+    <description>#{CGI.escape_html(description)}</description>
+  </data>
+</promoteRequest>
+      REQUEST
+      response.body[/<stagedRepositoryId>(.+?)<\/stagedRepositoryId>/, 1]
+    end
+
+    def files
+      _files = []
+      directories = [""]
+      until directories.empty?
+        directory = directories.shift
+        list(directory).each do |path|
+          resolved_path = "#{directory}#{path}"
+          case path
+          when "../"
+          when /\/\z/
+            directories << resolved_path
+          else
+            _files << resolved_path
+          end
+        end
+      end
+      _files
+    end
+
+    def list(path)
+      url = build_deployed_url(path)
+      with_retry(3, url) do
+        begin
+          request(:get, {}, url) do |response|
+            response.body.scan(/<a href="(.+?)"/).flatten
+          end
+        rescue Error => error
+          case error.response
+          when Net::HTTPNotFound
+            return []
+          else
+            raise
+          end
+        end
+      end
+    end
+
+    def upload(path, destination_path)
+      destination_url = build_api_url(destination_path)
+      with_retry(3, destination_url) do
+        headers = {
+          "Content-Length" => File.size(path).to_s,
+          "Content-Type" => content_type(path),
+        }
+        File.open(path, "rb") do |input|
+          request(:put, headers, destination_url, body: input)
+        end
+      end
+    end
+
+    private
+    def build_read_url(path)
+      build_deployed_url(path)
+    end
+
+    def build_write_url(path)
+      build_api_url(path)
+    end
+
+    def build_api_url(path)
+      url_string = STAGING_API_BASE_URL +
+                   "/deployByRepositoryId/#{@repository_id}/org/apache/arrow" +
+                   "/#{@prefix}/#{path}"
+      URI(url_string)
+    end
+
+    def build_deployed_url(path)
+      url_string = BASE_URL +
+                   "/content/repositories/staging/org/apache/arrow" +
+                   "/#{@prefix}/#{path}"
+      URI(url_string)
+    end
+
+    def setup_auth(request)
+      request.basic_auth(@asf_user, @asf_password)
+    end
+
+    def content_type(path)
+      case File.extname(path)
+      when ".rpm"
+        "application/x-redhat-package-manager"
+      else
+        "application/octet-stream"
+      end
+    end
+  end
+
+  class ArtifactoryClient < HTTPClient
+    def initialize(prefix, api_key)
+      @prefix = prefix
+      @api_key = api_key
+      super()
+    end
+
+    def files
+      _files = []
+      directories = [""]
+      until directories.empty?
+        directory = directories.shift
+        list(directory).each do |path|
+          resolved_path = "#{directory}#{path}"
+          case path
+          when "../"
+          when /\/\z/
+            directories << resolved_path
+          else
+            _files << resolved_path
+          end
+        end
+      end
+      _files
+    end
+
+    def list(path)
+      url = build_deployed_url(path)
+      with_retry(3, url) do
+        begin
+          request(:get, {}, url) do |response|
+            response.body.scan(/<a href="(.+?)"/).flatten
+          end
+        rescue Error => error
+          case error.response
+          when Net::HTTPNotFound
+            return []
+          else
+            raise
+          end
+        end
+      end
+    end
+
+    def upload(path, destination_path)
+      destination_url = build_deployed_url(destination_path)
+      with_retry(3, destination_url) do
+        sha1 = Digest::SHA1.file(path).hexdigest
+        sha256 = Digest::SHA256.file(path).hexdigest
+        headers = {
+          "X-Artifactory-Last-Modified" => File.mtime(path).rfc2822,
+          "X-Checksum-Deploy" => "false",
+          "X-Checksum-Sha1" => sha1,
+          "X-Checksum-Sha256" => sha256,
+          "Content-Length" => File.size(path).to_s,
+          "Content-Type" => "application/octet-stream",
+        }
+        File.open(path, "rb") do |input|
+          request(:put, headers, destination_url, body: input)
+        end
+      end
+    end
+
+    def copy(source, destination)
+      url = build_api_url("copy/arrow/#{source}",
+                          "to" => "/arrow/#{destination}")
+      with_retry(3, url) do
+        with_read_timeout(300) do
+          request(:post, {}, url)
+        end
+      end
+    end
+
+    private
+    def build_read_url(path)
+      build_deployed_url(path)
+    end
+
+    def build_write_url(path)
+      build_api_url(path, {})
+    end
+
+    def build_api_url(path, parameters)
+      uri_string = "https://apache.jfrog.io/artifactory/api/#{path}"
+      unless parameters.empty?
+        uri_string << "?"
+        escaped_parameters = parameters.collect do |key, value|
+          "#{CGI.escape(key)}=#{CGI.escape(value)}"
+        end
+        uri_string << escaped_parameters.join("&")
+      end
+      URI(uri_string)
+    end
+
+    def build_deployed_url(path)
+      uri_string = "https://apache.jfrog.io/artifactory/arrow"
+      uri_string << "/#{@prefix}" unless @prefix.nil?
+      uri_string << "/#{path}"
+      URI(uri_string)
+    end
+
+    def setup_auth(request)
+      request["X-JFrog-Art-Api"] = @api_key
+    end
+  end
+
+  class HTTPClientPool
     class << self
-      def open(prefix, api_key)
-        pool = new(prefix, api_key)
+      def open(*args)
+        pool = new(*args)
         begin
           yield(pool)
         ensure
@@ -570,9 +706,8 @@ class BinaryTask
       end
     end
 
-    def initialize(prefix, api_key)
-      @prefix = prefix
-      @api_key = api_key
+    def initialize(*args)
+      @args = args
       @mutex = Thread::Mutex.new
       @clients = []
     end
@@ -580,7 +715,7 @@ class BinaryTask
     def pull
       client = @mutex.synchronize do
         if @clients.empty?
-          ArtifactoryClient.new(@prefix, @api_key)
+          create_client
         else
           @clients.pop
         end
@@ -600,6 +735,20 @@ class BinaryTask
 
     def close
       @clients.each(&:close)
+    end
+  end
+
+  class MavenRepositoryClientPool < HTTPClientPool
+    private
+    def create_client
+      MavenRepositoryClient.new(*@args)
+    end
+  end
+
+  class ArtifactoryClientPool < HTTPClientPool
+    private
+    def create_client
+      ArtifactoryClient.new(*@args)
     end
   end
 
@@ -842,6 +991,14 @@ class BinaryTask
 
   def artifactory_api_key
     env_value("ARTIFACTORY_API_KEY")
+  end
+
+  def asf_user
+    env_value("ASF_USER")
+  end
+
+  def asf_password
+    env_value("ASF_PASSWORD")
   end
 
   def artifacts_dir
