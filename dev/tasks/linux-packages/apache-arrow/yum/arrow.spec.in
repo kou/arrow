@@ -931,6 +931,9 @@ Documentation for Apache Parquet GLib.
 %endif
 
 %changelog
+* Mon Oct 06 2025 Sutou Kouhei <kou@clear-code.com> - 22.0.0-1
+- New upstream release.
+
 * Fri Jul 11 2025 Bryce Mecum <petridish@gmail.com> - 21.0.0-1
 - New upstream release.
 
